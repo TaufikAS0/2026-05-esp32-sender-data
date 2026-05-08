@@ -2,12 +2,15 @@
 
 // === WiFi ===
 #ifndef WIFI_SSID
-#define WIFI_SSID       "REPLACE_ME"
+#define WIFI_SSID       "WKT"
 #endif
 #ifndef WIFI_PASSWORD
-#define WIFI_PASSWORD   "REPLACE_ME"
+#define WIFI_PASSWORD   "69696969"
 #endif
 #define MDNS_HOSTNAME   "sender"       // akses via http://sender.local
+#define WIFI_CONNECT_TIMEOUT_MS    12000UL
+#define WIFI_RECONNECT_INTERVAL_MS 10000UL
+#define HTTP_PORT                  80
 
 // === UART ===
 #define UART_BAUDRATE   115200          // harus match dengan logger

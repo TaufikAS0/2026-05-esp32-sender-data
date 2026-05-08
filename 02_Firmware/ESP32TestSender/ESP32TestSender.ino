@@ -8,8 +8,10 @@
 #include "web_ui.h"
 #include "status_led.h"
 #include "firmware_version.h"
+#include "wifi_manager.h"
 
 static unsigned long s_last_heartbeat = 0;
+static bool s_spiffs_ready = false;
 
 void setup() {
     Serial.begin(115200);
@@ -29,28 +31,13 @@ void setup() {
     Serial2.begin(UART_BAUDRATE, SERIAL_8N1, UART_RX_PIN, UART_TX_PIN);
     Serial.println("Serial2 initialized at " + String(UART_BAUDRATE) + " baud");
 
-    // WiFi (non-blocking)
-    Serial.print("Connecting to WiFi: ");
-    Serial.println(WIFI_SSID);
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-    // Don't wait here — sender task will run regardless
-
-    // mDNS
-    if (MDNS.begin(MDNS_HOSTNAME)) {
-        Serial.println("mDNS responder started: http://" MDNS_HOSTNAME ".local");
-    } else {
-        Serial.println("mDNS responder failed to start");
-    }
-
-    // SPIFFS
-    if (!SPIFFS.begin(true)) {
-        Serial.println("SPIFFS mount failed!");
-    } else {
-        Serial.println("SPIFFS mounted");
-    }
+    // SPIFFS (don't block boot if it fails)
+    s_spiffs_ready = SPIFFS.begin(true);
+    Serial.printf("[SPIFFS] %s\n", s_spiffs_ready ? "Mounted" : "Mount failed");
 
     // Init modules
     sender_task_init();
+    wifi_manager_init();
     web_ui_init();
 
     stats_set_state(SS_IDLE);
@@ -60,20 +47,8 @@ void setup() {
 }
 
 void loop() {
-    // WiFi reconnect (non-blocking background)
-    if (WiFi.status() != WL_CONNECTED) {
-        static unsigned long s_last_wifi_retry = 0;
-        if (millis() - s_last_wifi_retry > 5000) {
-            s_last_wifi_retry = millis();
-            Serial.println("WiFi reconnecting...");
-            WiFi.reconnect();
-        }
-    }
-
-    // WebSocket push
+    wifi_manager_update();
     web_ui_update();
-
-    // Status LED update
     status_led_update();
 
     // Heartbeat every 60s
@@ -93,5 +68,5 @@ void loop() {
         }
     }
 
-    delay(10);
+    delay(2);
 }
