@@ -381,6 +381,7 @@ static void handle_start() {
 
 void web_ui_init() {
     s_server.on("/", HTTP_GET, []() {
+        Serial.printf("[WEB] GET / from %s\n", s_server.client().remoteIP().toString().c_str());
         serve_static_or_fallback("/index.html", "text/html", kFallbackIndexHtml);
     });
     s_server.on("/app.js", HTTP_GET, []() {
@@ -403,6 +404,7 @@ void web_ui_init() {
     });
 
     s_server.on("/api/status", HTTP_GET, []() {
+        Serial.printf("[WEB] GET /api/status from %s\n", s_server.client().remoteIP().toString().c_str());
         JsonDocument doc;
         build_status_json(doc);
         String json;

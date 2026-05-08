@@ -31,7 +31,7 @@
 // === Timing ===
 #define SENDER_TASK_STACK_SIZE  4096
 #define SENDER_TASK_PRIORITY    5
-#define SENDER_TASK_CORE        1
+#define SENDER_TASK_CORE        0
 
 // === Internal Log ===
 #define SENDER_LOG_MAX_LINES    200
