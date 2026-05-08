@@ -65,7 +65,7 @@ select:focus,input:focus{outline:none;border-color:#10b981}
 <body>
 <div class="container">
   <header>
-    <h1>ESP32 Test Sender</h1>
+    <h1>ESP32 Test Sender <small id="fw-version" style="font-size:.65rem;color:#94a3b8;font-weight:400;">v" FIRMWARE_VERSION_STRING R"(</small></h1>
     <div class="conn"><span id="conn-dot"></span><span id="conn-text">Connecting...</span></div>
   </header>
   <div class="notice">

@@ -43,7 +43,9 @@ function updateStats(d){
   $('st-state').textContent=st;
   $('st-state').className='val badge '+st.toLowerCase();
   $('st-uptime').textContent=fmtTime(d.uptime_sec||0);
-  $('st-ip').textContent=d.ip||'-'
+  $('st-ip').textContent=d.ip||'-';
+  const v=document.getElementById('fw-version');
+  if(v&&d.version)v.textContent='v'+d.version;
   $('ls-lines').textContent=d.total_lines_sent||0;
   $('ls-seq').textContent=d.current_seq||0;
   $('ls-rate').textContent=(d.actual_rate_hz||0).toFixed(1)+' Hz';
