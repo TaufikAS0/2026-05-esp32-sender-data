@@ -1,0 +1,22 @@
+# Arduino IDE / build artifacts
+build/
+dist/
+*.bin
+*.elf
+*.map
+*.hex
+*.ino.bootloader.bin
+*.ino.partitions.bin
+
+# Editor / OS
+.vscode/
+.idea/
+*.code-workspace
+Thumbs.db
+Desktop.ini
+
+# Local firmware overrides
+02_Firmware/*/config_local.h
+
+# Sandbox
+_sandbox/

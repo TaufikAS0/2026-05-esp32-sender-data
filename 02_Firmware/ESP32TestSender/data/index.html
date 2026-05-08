@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESP32 Test Sender</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>ESP32 Test Sender</h1>
+    <div class="conn"><span id="conn-dot"></span><span id="conn-text">Connecting...</span></div>
+  </header>
+
+  <section class="status-bar">
+    <div class="stat-row">
+      <div class="stat"><span class="label">Status</span><span id="st-state" class="val badge">IDLE</span></div>
+      <div class="stat"><span class="label">Uptime</span><span id="st-uptime" class="val">0s</span></div>
+      <div class="stat"><span class="label">IP</span><span id="st-ip" class="val">-</span></div>
+    </div>
+  </section>
+
+  <section class="controls">
+    <label>Scenario</label>
+    <select id="scenario">
+      <option value="steady">Steady</option>
+      <option value="burst">Burst</option>
+      <option value="ramp">Ramp</option>
+      <option value="gap_inject">Gap Inject</option>
+      <option value="endurance">Endurance</option>
+    </select>
+
+    <div id="params"></div>
+
+    <div class="btn-row">
+      <button id="btn-start" class="btn primary">&#9654; Start</button>
+      <button id="btn-pause" class="btn" disabled>&#9208; Pause</button>
+      <button id="btn-resume" class="btn" disabled>&#9654; Resume</button>
+      <button id="btn-stop" class="btn danger" disabled>&#9632; Stop</button>
+      <button id="btn-reset" class="btn">&#8634; Reset Seq</button>
+    </div>
+    <div id="alert" class="alert hidden"></div>
+  </section>
+
+  <section class="live-stats">
+    <h2>Live Stats</h2>
+    <div class="grid">
+      <div class="card"><div class="label">Total Lines</div><div id="ls-lines" class="big">0</div></div>
+      <div class="card"><div class="label">Current Seq</div><div id="ls-seq" class="big">0</div></div>
+      <div class="card"><div class="label">Actual Rate</div><div id="ls-rate" class="big">0 Hz</div></div>
+      <div class="card"><div class="label">Target Rate</div><div id="ls-target" class="big">0 Hz</div></div>
+      <div class="card"><div class="label">Elapsed</div><div id="ls-elapsed" class="big">00:00:00</div></div>
+      <div class="card"><div class="label">Remaining</div><div id="ls-remaining" class="big">-</div></div>
+      <div class="card"><div class="label">Injected Gaps</div><div id="ls-gaps" class="big">0</div></div>
+      <div class="card"><div class="label">Free Heap</div><div id="ls-heap" class="big">0</div></div>
+    </div>
+  </section>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>
