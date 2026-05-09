@@ -15,6 +15,7 @@ struct ScenarioParams {
     // Common
     PayloadSize payload_size = DEFAULT_PAYLOAD_SIZE;
     uint32_t duration_sec = DEFAULT_DURATION_SEC;
+    uint32_t custom_payload_size = 100;
 
     // steady, gap_inject
     float rate_hz = DEFAULT_RATE_HZ;

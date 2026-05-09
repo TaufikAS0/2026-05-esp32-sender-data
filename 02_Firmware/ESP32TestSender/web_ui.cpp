@@ -65,7 +65,9 @@ select:focus,input:focus{outline:none;border-color:#10b981}
 <body>
 <div class="container">
   <header>
-    <h1>ESP32 Test Sender <small id="fw-version" style="font-size:.65rem;color:#94a3b8;font-weight:400;">v" FIRMWARE_VERSION_STRING R"(</small></h1>
+    <h1>ESP32 Test Sender <small id="fw-version" style="font-size:.65rem;color:#94a3b8;font-weight:400;">v)HTML"
+FIRMWARE_VERSION_STRING
+R"HTML(</small></h1>
     <div class="conn"><span id="conn-dot"></span><span id="conn-text">Connecting...</span></div>
   </header>
   <div class="notice">
@@ -116,11 +118,11 @@ select:focus,input:focus{outline:none;border-color:#10b981}
 const $=id=>document.getElementById(id);
 let pollTimer=null;
 const scenarios={
-  steady:[{k:'rate_hz',l:'Rate',u:'Hz',d:10,min:0.1,max:200},{k:'payload_size',l:'Payload',u:'',d:'medium',opts:['short','medium','long','custom']},{k:'duration_sec',l:'Duration',u:'sec (0=inf)',d:86400,min:0,max:259200}],
-  burst:[{k:'burst_lines',l:'Burst Lines',u:'',d:50,min:1,max:10000},{k:'burst_rate_hz',l:'Burst Rate',u:'Hz',d:100,min:1,max:500},{k:'pause_ms',l:'Pause',u:'ms',d:2000,min:100,max:60000},{k:'payload_size',l:'Payload',u:'',d:'medium',opts:['short','medium','long','custom']},{k:'duration_sec',l:'Duration',u:'sec (0=inf)',d:86400,min:0,max:259200}],
-  ramp:[{k:'start_rate_hz',l:'Start Rate',u:'Hz',d:1,min:0.1,max:200},{k:'end_rate_hz',l:'End Rate',u:'Hz',d:100,min:0.1,max:200},{k:'ramp_duration_sec',l:'Ramp Duration',u:'sec',d:3600,min:1,max:259200},{k:'hold_at_max',l:'Hold at Max',u:'sec (0=stop)',d:0,min:0,max:259200},{k:'payload_size',l:'Payload',u:'',d:'medium',opts:['short','medium','long','custom']}],
-  gap_inject:[{k:'rate_hz',l:'Rate',u:'Hz',d:10,min:0.1,max:200},{k:'gap_every_sec',l:'Gap Every',u:'sec',d:300,min:10,max:86400},{k:'gap_size',l:'Gap Size',u:'lines',d:5,min:1,max:1000},{k:'payload_size',l:'Payload',u:'',d:'medium',opts:['short','medium','long','custom']},{k:'duration_sec',l:'Duration',u:'sec (0=inf)',d:3600,min:0,max:259200}],
-  endurance:[{k:'base_rate_hz',l:'Base Rate',u:'Hz',d:10,min:0.1,max:200},{k:'burst_every_sec',l:'Burst Every',u:'sec',d:600,min:1,max:86400},{k:'burst_lines',l:'Burst Lines',u:'',d:100,min:1,max:10000},{k:'burst_rate_hz',l:'Burst Rate',u:'Hz',d:50,min:1,max:500},{k:'payload_size',l:'Payload',u:'',d:'medium',opts:['short','medium','long','custom']},{k:'duration_sec',l:'Duration',u:'sec (0=inf)',d:86400,min:0,max:259200}]
+  steady:[{k:'rate_hz',l:'Rate',u:'Hz',d:10,min:0.1,max:200},{k:'payload_size',l:'Payload',u:'',d:'medium',opts:['short','medium','long','custom']},{k:'custom_payload_size',l:'Custom Size',u:'bytes (1-250)',d:100,min:1,max:250,showIf:{k:'payload_size',v:'custom'}},{k:'duration_sec',l:'Duration',u:'sec (0=inf)',d:86400,min:0,max:259200}],
+  burst:[{k:'burst_lines',l:'Burst Lines',u:'',d:50,min:1,max:10000},{k:'burst_rate_hz',l:'Burst Rate',u:'Hz',d:100,min:1,max:500},{k:'pause_ms',l:'Pause',u:'ms',d:2000,min:100,max:60000},{k:'payload_size',l:'Payload',u:'',d:'medium',opts:['short','medium','long','custom']},{k:'custom_payload_size',l:'Custom Size',u:'bytes (1-250)',d:100,min:1,max:250,showIf:{k:'payload_size',v:'custom'}},{k:'duration_sec',l:'Duration',u:'sec (0=inf)',d:86400,min:0,max:259200}],
+  ramp:[{k:'start_rate_hz',l:'Start Rate',u:'Hz',d:1,min:0.1,max:200},{k:'end_rate_hz',l:'End Rate',u:'Hz',d:100,min:0.1,max:200},{k:'ramp_duration_sec',l:'Ramp Duration',u:'sec',d:3600,min:1,max:259200},{k:'hold_at_max',l:'Hold at Max',u:'sec (0=stop)',d:0,min:0,max:259200},{k:'payload_size',l:'Payload',u:'',d:'medium',opts:['short','medium','long','custom']},{k:'custom_payload_size',l:'Custom Size',u:'bytes (1-250)',d:100,min:1,max:250,showIf:{k:'payload_size',v:'custom'}}],
+  gap_inject:[{k:'rate_hz',l:'Rate',u:'Hz',d:10,min:0.1,max:200},{k:'gap_every_sec',l:'Gap Every',u:'sec',d:300,min:10,max:86400},{k:'gap_size',l:'Gap Size',u:'lines',d:5,min:1,max:1000},{k:'payload_size',l:'Payload',u:'',d:'medium',opts:['short','medium','long','custom']},{k:'custom_payload_size',l:'Custom Size',u:'bytes (1-250)',d:100,min:1,max:250,showIf:{k:'payload_size',v:'custom'}},{k:'duration_sec',l:'Duration',u:'sec (0=inf)',d:3600,min:0,max:259200}],
+  endurance:[{k:'base_rate_hz',l:'Base Rate',u:'Hz',d:10,min:0.1,max:200},{k:'burst_every_sec',l:'Burst Every',u:'sec',d:600,min:1,max:86400},{k:'burst_lines',l:'Burst Lines',u:'',d:100,min:1,max:10000},{k:'burst_rate_hz',l:'Burst Rate',u:'Hz',d:50,min:1,max:500},{k:'payload_size',l:'Payload',u:'',d:'medium',opts:['short','medium','long','custom']},{k:'custom_payload_size',l:'Custom Size',u:'bytes (1-250)',d:100,min:1,max:250,showIf:{k:'payload_size',v:'custom'}},{k:'duration_sec',l:'Duration',u:'sec (0=inf)',d:86400,min:0,max:259200}]
 };
 function renderParams(){
   const sc=$('scenario').value;
@@ -133,6 +135,21 @@ function renderParams(){
     html+=`</div>`;
   });
   $('params').innerHTML=html;
+  const psEl=$('p-payload_size');
+  if(psEl){
+    psEl.addEventListener('change',updateCustomSizeVisibility);
+  }
+  updateCustomSizeVisibility();
+}
+function updateCustomSizeVisibility(){
+  const psEl=$('p-payload_size');
+  const csEl=$('p-custom_payload_size');
+  if(psEl&&csEl){
+    const field=csEl.closest('.field');
+    if(field){
+      field.style.display=psEl.value==='custom'?'':'none';
+    }
+  }
 }
 function setConn(ok){$('conn-dot').className=ok?'on':'off';$('conn-text').textContent=ok?'Connected':'Disconnected';}
 async function fetchStatus(){
@@ -188,7 +205,15 @@ function gatherParams(){
   const sc=$('scenario').value;
   const defs=scenarios[sc];
   const params={};
-  defs.forEach(p=>{const el=$('p-'+p.k);params[p.k]=p.opts?el.value:parseFloat(el.value);});
+  defs.forEach(p=>{
+    const el=$('p-'+p.k);
+    if(!el)return;
+    if(p.k==='custom_payload_size'){
+      const psEl=$('p-payload_size');
+      if(psEl&&psEl.value!=='custom')return;
+    }
+    params[p.k]=p.opts?el.value:parseFloat(el.value);
+  });
   return {scenario:sc,params};
 }
 $('scenario').addEventListener('change',renderParams);
@@ -355,6 +380,7 @@ static void handle_start() {
         params.hold_at_max = p["hold_at_max"] | 0;
         params.gap_every_sec = p["gap_every_sec"] | 300;
         params.gap_size = p["gap_size"] | 5;
+        params.custom_payload_size = p["custom_payload_size"] | 100;
         params.base_rate_hz = p["base_rate_hz"] | 10.0f;
         params.burst_every_sec = p["burst_every_sec"] | 600;
         params.duration_sec = p["duration_sec"] | DEFAULT_DURATION_SEC;

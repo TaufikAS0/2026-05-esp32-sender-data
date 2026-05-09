@@ -1,5 +1,6 @@
 #include "scenarios.h"
 #include "sender_stats.h"
+#include "sender_task.h"
 #include "config.h"
 #include <esp_timer.h>
 
@@ -105,24 +106,53 @@ static bool wait_until(int64_t target_time_us) {
     return true;
 }
 
+static void rate_tracker_init(uint32_t& lines_snapshot, uint32_t& last_check_ms) {
+    lines_snapshot = stats_get_total_lines();
+    last_check_ms = millis();
+}
+
+static void rate_tracker_update(uint32_t& lines_snapshot, uint32_t& last_check_ms) {
+    uint32_t now_ms = millis();
+    uint32_t elapsed_ms = now_ms - last_check_ms;
+    if (elapsed_ms < 1000) {
+        return;
+    }
+
+    uint32_t total_lines_now = stats_get_total_lines();
+    uint32_t delta_lines = total_lines_now - lines_snapshot;
+    uint32_t interval_sec = elapsed_ms / 1000;
+    if (interval_sec == 0) {
+        interval_sec = 1;
+    }
+
+    stats_update_actual_rate(delta_lines, interval_sec);
+    lines_snapshot = total_lines_now;
+    last_check_ms = now_ms;
+}
+
 void run_steady(const ScenarioParams& params) {
     float rate_hz = params.rate_hz;
     if (rate_hz < 0.1f) rate_hz = 0.1f;
     int64_t interval_us = (int64_t)(1000000.0 / rate_hz);
     int64_t next_send = esp_timer_get_time();
     uint32_t start_sec = millis() / 1000;
+    uint32_t rate_lines_snapshot = 0;
+    uint32_t rate_last_check_ms = 0;
 
     stats_set_target_rate_hz(rate_hz);
+    rate_tracker_init(rate_lines_snapshot, rate_last_check_ms);
 
     while (!g_sender_stop) {
         while (g_sender_paused && !g_sender_stop) {
             vTaskDelay(10);
+            rate_tracker_update(rate_lines_snapshot, rate_last_check_ms);
         }
         if (g_sender_stop) break;
 
         if (!wait_until(next_send)) break;
 
-        send_line(params.payload_size);
+        send_line(params.payload_size, params.custom_payload_size);
+        rate_tracker_update(rate_lines_snapshot, rate_last_check_ms);
         next_send += interval_us;
 
         // Update remaining
@@ -153,21 +183,27 @@ void run_burst(const ScenarioParams& params) {
     int64_t burst_interval_us = (int64_t)(1000000.0 / burst_rate);
     uint32_t start_sec = millis() / 1000;
     uint32_t burst_counter = 0;
+    uint32_t rate_lines_snapshot = 0;
+    uint32_t rate_last_check_ms = 0;
 
     stats_set_target_rate_hz(burst_rate);
+    rate_tracker_init(rate_lines_snapshot, rate_last_check_ms);
 
     while (!g_sender_stop) {
         // Burst phase
+        int64_t burst_start = esp_timer_get_time();
         for (uint32_t i = 0; i < params.burst_lines; i++) {
             if (g_sender_stop) break;
             while (g_sender_paused && !g_sender_stop) {
                 vTaskDelay(10);
+                rate_tracker_update(rate_lines_snapshot, rate_last_check_ms);
             }
             if (g_sender_stop) break;
 
-            int64_t next_send = esp_timer_get_time() + burst_interval_us * i;
+            int64_t next_send = burst_start + (int64_t)burst_interval_us * i;
             if (!wait_until(next_send)) break;
-            send_line(params.payload_size);
+            send_line(params.payload_size, params.custom_payload_size);
+            rate_tracker_update(rate_lines_snapshot, rate_last_check_ms);
         }
         if (g_sender_stop) break;
 
@@ -176,10 +212,14 @@ void run_burst(const ScenarioParams& params) {
         while ((millis() - pause_start) < params.pause_ms && !g_sender_stop) {
             while (g_sender_paused && !g_sender_stop) {
                 vTaskDelay(10);
+                rate_tracker_update(rate_lines_snapshot, rate_last_check_ms);
             }
+            rate_tracker_update(rate_lines_snapshot, rate_last_check_ms);
             vTaskDelay(10);
         }
         if (g_sender_stop) break;
+
+        rate_tracker_update(rate_lines_snapshot, rate_last_check_ms);
 
         // Duration check
         if (params.duration_sec > 0) {
@@ -200,14 +240,18 @@ void run_ramp(const ScenarioParams& params) {
     if (ramp_dur == 0) ramp_dur = 1;
     uint32_t start_sec = millis() / 1000;
     int last_logged_rate = (int)start_rate;
+    uint32_t rate_lines_snapshot = 0;
+    uint32_t rate_last_check_ms = 0;
 
     stats_set_target_rate_hz(start_rate);
+    rate_tracker_init(rate_lines_snapshot, rate_last_check_ms);
 
     int64_t next_send = esp_timer_get_time();
 
     while (!g_sender_stop) {
         while (g_sender_paused && !g_sender_stop) {
             vTaskDelay(10);
+            rate_tracker_update(rate_lines_snapshot, rate_last_check_ms);
         }
         if (g_sender_stop) break;
 
@@ -223,6 +267,8 @@ void run_ramp(const ScenarioParams& params) {
 
         int current_rate_int = (int)current_rate;
         if (current_rate_int != last_logged_rate) {
+            sender_log("RATE_CHANGE from=%d to=%d Hz",
+                       last_logged_rate, current_rate_int);
             last_logged_rate = current_rate_int;
         }
         stats_set_target_rate_hz(current_rate);
@@ -230,7 +276,8 @@ void run_ramp(const ScenarioParams& params) {
         int64_t interval_us = (int64_t)(1000000.0 / current_rate);
 
         if (!wait_until(next_send)) break;
-        send_line(params.payload_size);
+        send_line(params.payload_size, params.custom_payload_size);
+        rate_tracker_update(rate_lines_snapshot, rate_last_check_ms);
         next_send += interval_us;
 
         // Duration / hold logic
@@ -264,12 +311,16 @@ void run_gap_inject(const ScenarioParams& params) {
     int64_t next_send = esp_timer_get_time();
     uint32_t start_sec = millis() / 1000;
     uint32_t next_gap_sec = start_sec + params.gap_every_sec;
+    uint32_t rate_lines_snapshot = 0;
+    uint32_t rate_last_check_ms = 0;
 
     stats_set_target_rate_hz(rate_hz);
+    rate_tracker_init(rate_lines_snapshot, rate_last_check_ms);
 
     while (!g_sender_stop) {
         while (g_sender_paused && !g_sender_stop) {
             vTaskDelay(10);
+            rate_tracker_update(rate_lines_snapshot, rate_last_check_ms);
         }
         if (g_sender_stop) break;
 
@@ -280,14 +331,20 @@ void run_gap_inject(const ScenarioParams& params) {
         // Check gap injection
         if (now_sec >= next_gap_sec && params.gap_size > 0) {
             uint32_t seq_before = stats_get_current_seq();
-            stats_increment_seq(params.gap_size + 1); // skip gap_size numbers
+            stats_increment_seq(params.gap_size);
             uint32_t seq_after = stats_get_current_seq();
             record_injected_gap(seq_before, seq_after, params.gap_size);
+            sender_log("GAP_INJECT at seq=%lu skipped=%lu (%lu-%lu)",
+                       (unsigned long)seq_before,
+                       (unsigned long)params.gap_size,
+                       (unsigned long)(seq_before + 1),
+                       (unsigned long)(seq_after - 1));
             stats_increment_gaps_count();
             next_gap_sec = now_sec + params.gap_every_sec;
         } else {
-            send_line(params.payload_size);
+            send_line(params.payload_size, params.custom_payload_size);
         }
+        rate_tracker_update(rate_lines_snapshot, rate_last_check_ms);
 
         next_send += interval_us;
 
@@ -320,12 +377,16 @@ void run_endurance(const ScenarioParams& params) {
     float burst_rate = params.burst_rate_hz;
     if (burst_rate < 1.0f) burst_rate = 1.0f;
     int64_t burst_interval_us = (int64_t)(1000000.0 / burst_rate);
+    uint32_t rate_lines_snapshot = 0;
+    uint32_t rate_last_check_ms = 0;
 
     stats_set_target_rate_hz(base_rate);
+    rate_tracker_init(rate_lines_snapshot, rate_last_check_ms);
 
     while (!g_sender_stop) {
         while (g_sender_paused && !g_sender_stop) {
             vTaskDelay(10);
+            rate_tracker_update(rate_lines_snapshot, rate_last_check_ms);
         }
         if (g_sender_stop) break;
 
@@ -340,7 +401,8 @@ void run_endurance(const ScenarioParams& params) {
 
         if (!wait_until(next_send)) break;
 
-        send_line(params.payload_size);
+        send_line(params.payload_size, params.custom_payload_size);
+        rate_tracker_update(rate_lines_snapshot, rate_last_check_ms);
 
         if (in_burst) {
             burst_lines_sent++;
