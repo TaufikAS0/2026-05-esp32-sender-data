@@ -7,6 +7,7 @@
 #include "sender_stats.h"
 #include "web_ui.h"
 #include "status_led.h"
+#include "oled_status.h"
 #include "firmware_version.h"
 #include "wifi_manager.h"
 
@@ -26,6 +27,7 @@ void setup() {
 
     // Status LED
     status_led_init();
+    oled_status_init();
 
     // UART2 for sender output
     Serial2.begin(UART_BAUDRATE, SERIAL_8N1, UART_RX_PIN, UART_TX_PIN);
@@ -50,6 +52,7 @@ void loop() {
     wifi_manager_update();
     web_ui_update();
     status_led_update();
+    oled_status_update();
 
     // Heartbeat every 60s
     if (millis() - s_last_heartbeat >= 60000) {

@@ -25,6 +25,15 @@
 // === Status LED ===
 #define STATUS_LED_PIN  2
 
+// === OLED (optional) ===
+#define OLED_WIDTH              128
+#define OLED_HEIGHT             64
+#define OLED_I2C_ADDRESS        0x3C
+#define OLED_SDA_PIN            21
+#define OLED_SCL_PIN            22
+#define OLED_RESET_PIN          (-1)
+#define OLED_REFRESH_MS         500UL
+
 // === Web ===
 #define WS_UPDATE_INTERVAL_MS   1000    // push stats ke browser tiap 1 detik
 
