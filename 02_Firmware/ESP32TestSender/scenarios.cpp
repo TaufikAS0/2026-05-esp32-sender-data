@@ -1,6 +1,7 @@
 #include "scenarios.h"
 #include "sender_stats.h"
 #include "sender_task.h"
+#include "uart_sender.h"
 #include "config.h"
 #include <esp_timer.h>
 
@@ -15,24 +16,69 @@ float generate_random_float(float min_val, float max_val) {
     return min_val + (float)random(0, 10001) / 10000.0f * (max_val - min_val);
 }
 
+static const char* scenario_label(SenderScenario scenario) {
+    switch (scenario) {
+        case SC_STEADY: return "steady";
+        case SC_BURST: return "burst";
+        case SC_RAMP: return "ramp";
+        case SC_GAP_INJECT: return "gap_inject";
+        case SC_ENDURANCE: return "endurance";
+    }
+    return "unknown";
+}
+
+static const char* state_label(SenderState state) {
+    switch (state) {
+        case SS_IDLE: return "IDLE";
+        case SS_RUNNING: return "RUNNING";
+        case SS_PAUSED: return "PAUSED";
+        case SS_COMPLETED: return "COMPLETED";
+        case SS_ERROR: return "ERROR";
+    }
+    return "UNKNOWN";
+}
+
+static void build_test_base_payload(char* buf, size_t buf_size, bool extended) {
+    const uint32_t test_count = stats_get_total_lines() + 1U;
+    const uint32_t uptime_sec = millis() / 1000U;
+    const uint32_t baudrate = uart_sender_get_baudrate();
+    const float target_rate = stats_get_target_rate_hz();
+    const uint32_t gap_count = stats_get_injected_gaps_count();
+
+    if (extended) {
+        snprintf(buf, buf_size,
+                 "TEST_COUNT:%lu,SCN:%s,RATE:%.1f,BAUD:%lu,UP:%lu,LINES:%lu,GAPS:%lu,STATE:%s",
+                 (unsigned long)test_count,
+                 scenario_label(g_active_scenario),
+                 (double)target_rate,
+                 (unsigned long)baudrate,
+                 (unsigned long)uptime_sec,
+                 (unsigned long)stats_get_total_lines(),
+                 (unsigned long)gap_count,
+                 state_label(stats_get_state()));
+    } else {
+        snprintf(buf, buf_size,
+                 "TEST_COUNT:%lu,SCN:%s,BAUD:%lu,RATE:%.1f,STATE:%s",
+                 (unsigned long)test_count,
+                 scenario_label(g_active_scenario),
+                 (unsigned long)baudrate,
+                 (double)target_rate,
+                 state_label(stats_get_state()));
+    }
+}
+
 static void build_payload(PayloadSize psize, char* buf, size_t buf_size, uint32_t custom_target_size) {
     if (psize == PAYLOAD_SHORT) {
-        float t = generate_random_float(20.0f, 35.0f);
-        snprintf(buf, buf_size, "T:%.1f,S:OK", t);
+        snprintf(buf, buf_size,
+                 "TC:%lu,SC:%s,B:%lu",
+                 (unsigned long)(stats_get_total_lines() + 1U),
+                 scenario_label(g_active_scenario),
+                 (unsigned long)uart_sender_get_baudrate());
     } else if (psize == PAYLOAD_MEDIUM) {
-        float t = generate_random_float(20.0f, 35.0f);
-        float h = generate_random_float(30.0f, 80.0f);
-        float p = generate_random_float(990.0f, 1030.0f);
-        float v = generate_random_float(3.0f, 3.6f);
-        snprintf(buf, buf_size, "T:%.1f,H:%.1f,P:%.1f,V:%.2f,S:OK", t, h, p, v);
+        build_test_base_payload(buf, buf_size, false);
     } else if (psize == PAYLOAD_LONG) {
-        float t = generate_random_float(20.0f, 35.0f);
-        float h = generate_random_float(30.0f, 80.0f);
-        float p = generate_random_float(990.0f, 1030.0f);
-        float v = generate_random_float(3.0f, 3.6f);
-        // base medium
         char base[128];
-        snprintf(base, sizeof(base), "T:%.1f,H:%.1f,P:%.1f,V:%.2f,S:OK", t, h, p, v);
+        build_test_base_payload(base, sizeof(base), true);
         int base_len = strlen(base);
         int needed = 200 - base_len - 1;
         if (needed < 0) needed = 0;
@@ -44,14 +90,14 @@ static void build_payload(PayloadSize psize, char* buf, size_t buf_size, uint32_
             buf[pos++] = alphanum[random(0, alphanum_len)];
         }
         buf[pos] = '\0';
+    } else if (psize == PAYLOAD_COUNTING) {
+        snprintf(buf, buf_size,
+                 "COUNT:%lu",
+                 (unsigned long)(stats_get_total_lines() + 1U));
     } else {
         // custom
-        float t = generate_random_float(20.0f, 35.0f);
-        float h = generate_random_float(30.0f, 80.0f);
-        float p = generate_random_float(990.0f, 1030.0f);
-        float v = generate_random_float(3.0f, 3.6f);
         char base[128];
-        snprintf(base, sizeof(base), "T:%.1f,H:%.1f,P:%.1f,V:%.2f,S:OK", t, h, p, v);
+        build_test_base_payload(base, sizeof(base), true);
         int base_len = strlen(base);
         int target = (int)custom_target_size;
         if (target < 1) target = 1;
@@ -80,8 +126,14 @@ void send_line(PayloadSize psize, uint32_t custom_target_size) {
     uint32_t seq = stats_get_current_seq();
     char line[320];
     snprintf(line, sizeof(line), "%lu,%s\n", (unsigned long)seq, payload);
-
-    Serial2.print(line);
+    const size_t line_len = strlen(line);
+    const size_t written = uart_sender_write(reinterpret_cast<const uint8_t*>(line), line_len);
+    if (written != line_len) {
+        sender_log("UART_WRITE_FAIL wrote=%u expected=%u",
+                   (unsigned int)written,
+                   (unsigned int)line_len);
+        return;
+    }
 
     stats_increment_lines();
     stats_increment_seq(1);
@@ -458,6 +510,7 @@ const char* payload_size_to_string(PayloadSize ps) {
         case PAYLOAD_SHORT: return "short";
         case PAYLOAD_MEDIUM: return "medium";
         case PAYLOAD_LONG: return "long";
+        case PAYLOAD_COUNTING: return "counting";
         case PAYLOAD_CUSTOM: return "custom";
     }
     return "medium";
@@ -468,6 +521,7 @@ PayloadSize string_to_payload_size(const char* str) {
     if (strcmp(str, "short") == 0) return PAYLOAD_SHORT;
     if (strcmp(str, "medium") == 0) return PAYLOAD_MEDIUM;
     if (strcmp(str, "long") == 0) return PAYLOAD_LONG;
+    if (strcmp(str, "counting") == 0) return PAYLOAD_COUNTING;
     if (strcmp(str, "custom") == 0) return PAYLOAD_CUSTOM;
     return PAYLOAD_MEDIUM;
 }
