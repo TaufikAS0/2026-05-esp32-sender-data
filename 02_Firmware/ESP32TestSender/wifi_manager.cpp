@@ -116,6 +116,7 @@ void connect_station_async() {
 } // namespace
 
 void wifi_manager_init() {
+  WiFi.setSleep(false);
   stop_mdns();
   s_mode = NetworkMode::Offline;
   s_had_connection = false;

@@ -9,7 +9,7 @@
 <body>
 <div class="container">
   <header>
-    <h1>ESP32 Test Sender <small id="fw-version" style="font-size:.65rem;color:#94a3b8;font-weight:400;">v0.1.2</small></h1>
+    <h1>ESP32 Test Sender <small id="fw-version" style="font-size:.65rem;color:#94a3b8;font-weight:400;">v0.2.0</small></h1>
     <div class="conn"><span id="conn-dot"></span><span id="conn-text">Connecting...</span></div>
   </header>
 
@@ -18,6 +18,7 @@
       <div class="stat"><span class="label">Status</span><span id="st-state" class="val badge">IDLE</span></div>
       <div class="stat"><span class="label">Uptime</span><span id="st-uptime" class="val">0s</span></div>
       <div class="stat"><span class="label">IP</span><span id="st-ip" class="val">-</span></div>
+      <div class="stat"><span class="label">UART Baud</span><span id="st-baud" class="val">115200</span></div>
     </div>
   </section>
 
@@ -39,6 +40,17 @@
       <button id="btn-resume" class="btn" disabled>&#9654; Resume</button>
       <button id="btn-stop" class="btn danger" disabled>&#9632; Stop</button>
       <button id="btn-reset" class="btn">&#8634; Reset Seq</button>
+      <button id="btn-tx-test" class="btn">TX Test</button>
+    </div>
+    <div class="ota-panel">
+      <div class="ota-row">
+        <div>
+          <div class="ota-title">Arduino OTA</div>
+          <div id="ota-state" class="ota-state">OFF</div>
+        </div>
+        <button id="btn-ota" class="btn">Enable Arduino OTA</button>
+      </div>
+      <div id="ota-msg" class="ota-msg">Arduino OTA nonaktif secara default.</div>
     </div>
     <div id="alert" class="alert hidden"></div>
   </section>
@@ -54,6 +66,7 @@
       <div class="card"><div class="label">Remaining</div><div id="ls-remaining" class="big">-</div></div>
       <div class="card"><div class="label">Injected Gaps</div><div id="ls-gaps" class="big">0</div></div>
       <div class="card"><div class="label">Free Heap</div><div id="ls-heap" class="big">0</div></div>
+      <div class="card"><div class="label">Scenario</div><div id="ls-scn" class="big">-</div></div>
     </div>
   </section>
 </div>

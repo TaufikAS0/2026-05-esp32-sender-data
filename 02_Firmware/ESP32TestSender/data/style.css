@@ -26,6 +26,11 @@ select:focus,input:focus{outline:none;border-color:#10b981}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .btn.primary{background:#10b981;border-color:#10b981;color:#fff}
 .btn.danger{background:#ef4444;border-color:#ef4444;color:#fff}
+.ota-panel{margin-top:16px;padding:12px;border:1px solid #334155;border-radius:8px;background:#0f172a}
+.ota-row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.ota-title{font-size:.75rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.02em}
+.ota-state{font-size:1rem;color:#f8fafc;font-weight:700}
+.ota-msg{margin-top:8px;font-size:.85rem;color:#cbd5e1}
 .alert{margin-top:12px;padding:8px 12px;border-radius:6px;font-size:.9rem}
 .alert.err{background:#450a0a;color:#fca5a5}
 .alert.ok{background:#064e3b;color:#a7f3d0}

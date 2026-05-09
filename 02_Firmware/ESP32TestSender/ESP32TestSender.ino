@@ -7,6 +7,9 @@
 #include "sender_stats.h"
 #include "web_ui.h"
 #include "status_led.h"
+#include "oled_status.h"
+#include "ota_manager.h"
+#include "uart_sender.h"
 #include "firmware_version.h"
 #include "wifi_manager.h"
 
@@ -26,10 +29,15 @@ void setup() {
 
     // Status LED
     status_led_init();
+    oled_status_init();
 
     // UART2 for sender output
-    Serial2.begin(UART_BAUDRATE, SERIAL_8N1, UART_RX_PIN, UART_TX_PIN);
-    Serial.println("Serial2 initialized at " + String(UART_BAUDRATE) + " baud");
+    uart_sender_init();
+    char uart_msg[64];
+    snprintf(uart_msg, sizeof(uart_msg), "UART2 %s at %lu baud",
+             uart_sender_is_ready() ? "ready" : "init failed",
+             (unsigned long)uart_sender_get_baudrate());
+    Serial.println(uart_msg);
 
     // SPIFFS (don't block boot if it fails)
     s_spiffs_ready = SPIFFS.begin(true);
@@ -38,6 +46,7 @@ void setup() {
     // Init modules
     sender_task_init();
     wifi_manager_init();
+    ota_manager_init();
     web_ui_init();
 
     stats_set_state(SS_IDLE);
@@ -48,8 +57,10 @@ void setup() {
 
 void loop() {
     wifi_manager_update();
+    ota_manager_handle();
     web_ui_update();
     status_led_update();
+    oled_status_update();
 
     // Heartbeat every 60s
     if (millis() - s_last_heartbeat >= 60000) {
@@ -68,5 +79,5 @@ void loop() {
         }
     }
 
-    delay(2);
+    delay(1);
 }
