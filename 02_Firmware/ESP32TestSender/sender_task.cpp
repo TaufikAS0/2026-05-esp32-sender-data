@@ -2,6 +2,7 @@
 #include "sender_stats.h"
 #include "status_led.h"
 #include "config.h"
+#include "uart_sender.h"
 #include <esp_timer.h>
 
 volatile bool g_sender_paused = false;
@@ -66,15 +67,16 @@ static void sender_task_loop(void* param) {
         stats_reset_all();
         clear_injected_gaps();
         stats_set_state(SS_RUNNING);
-        status_led_set_pattern(LED_ON);
+        status_led_set_pattern(LED_BLINK_FAST);
 
-        sender_log("START scenario=%s rate=%.1f payload=%s duration=%lu",
+        sender_log("START scenario=%s rate=%.1f payload=%s baud=%lu duration=%lu",
                    (g_active_scenario == SC_STEADY) ? "steady" :
                    (g_active_scenario == SC_BURST) ? "burst" :
                    (g_active_scenario == SC_RAMP) ? "ramp" :
                    (g_active_scenario == SC_GAP_INJECT) ? "gap_inject" : "endurance",
                    g_active_params.rate_hz,
                    payload_size_to_string(g_active_params.payload_size),
+                   (unsigned long)g_active_params.serial_baudrate,
                    (unsigned long)g_active_params.duration_sec);
 
         switch (g_active_scenario) {
@@ -129,8 +131,16 @@ void sender_task_start(SenderScenario scenario, const ScenarioParams& params) {
     if (stats_get_state() == SS_RUNNING || stats_get_state() == SS_PAUSED) {
         return; // caller should check
     }
+    if (!uart_sender_is_ready()) {
+        sender_log("UART not ready, start rejected");
+        return;
+    }
     g_active_scenario = scenario;
     g_active_params = params;
+    if (!uart_sender_set_baudrate(params.serial_baudrate)) {
+        sender_log("UART baud change failed to %lu", (unsigned long)params.serial_baudrate);
+        return;
+    }
     g_sender_start_requested = true;
     xSemaphoreGive(s_start_sem);
 }
@@ -148,7 +158,7 @@ void sender_task_resume() {
     if (stats_get_state() == SS_PAUSED) {
         g_sender_paused = false;
         stats_set_state(SS_RUNNING);
-        status_led_set_pattern(LED_ON);
+        status_led_set_pattern(LED_BLINK_FAST);
         sender_log("RESUME at seq=%lu", (unsigned long)stats_get_current_seq());
     }
 }
