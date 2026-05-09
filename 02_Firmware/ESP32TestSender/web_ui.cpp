@@ -6,6 +6,7 @@
 #include "status_led.h"
 #include "firmware_version.h"
 #include "wifi_manager.h"
+#include "ota_manager.h"
 #include <WebServer.h>
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
@@ -49,6 +50,11 @@ select:focus,input:focus{outline:none;border-color:#10b981}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .btn.primary{background:#10b981;border-color:#10b981;color:#fff}
 .btn.danger{background:#ef4444;border-color:#ef4444;color:#fff}
+.ota-panel{margin-top:16px;padding:12px;border:1px solid #334155;border-radius:8px;background:#0f172a}
+.ota-row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.ota-title{font-size:.75rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.02em}
+.ota-state{font-size:1rem;color:#f8fafc;font-weight:700}
+.ota-msg{margin-top:8px;font-size:.85rem;color:#cbd5e1}
 .alert{margin-top:12px;padding:8px 12px;border-radius:6px;font-size:.9rem}
 .alert.err{background:#450a0a;color:#fca5a5}
 .alert.ok{background:#064e3b;color:#a7f3d0}
@@ -96,6 +102,16 @@ R"HTML(</small></h1>
       <button id="btn-resume" class="btn" disabled>&#9654; Resume</button>
       <button id="btn-stop" class="btn danger" disabled>&#9632; Stop</button>
       <button id="btn-reset" class="btn">&#8634; Reset Seq</button>
+    </div>
+    <div class="ota-panel">
+      <div class="ota-row">
+        <div>
+          <div class="ota-title">Arduino OTA</div>
+          <div id="ota-state" class="ota-state">OFF</div>
+        </div>
+        <button id="btn-ota" class="btn">Enable Arduino OTA</button>
+      </div>
+      <div id="ota-msg" class="ota-msg">Arduino OTA nonaktif secara default.</div>
     </div>
     <div id="alert" class="alert hidden"></div>
   </section>
@@ -170,6 +186,12 @@ function updateStats(d){
   $('ls-remaining').textContent=(rem===0xFFFFFFFF?'\u221e':fmtTime(rem||0));
   $('ls-gaps').textContent=d.injected_gaps_count||0;
   $('ls-heap').textContent=(d.free_heap||0).toLocaleString();
+  const otaEnabled=!!d.ota_enabled;
+  const otaState=(d.ota_state||'off').toUpperCase();
+  $('ota-state').textContent=otaState;
+  $('ota-msg').textContent=d.ota_message||'Arduino OTA nonaktif secara default.';
+  $('btn-ota').textContent=otaEnabled?'Disable Arduino OTA':'Enable Arduino OTA';
+  $('btn-ota').disabled=d.ota_state==='uploading'||d.ota_state==='restarting';
   const running=st==='RUNNING';
   const paused=st==='PAUSED';
   const idle=st==='IDLE'||st==='COMPLETED'||st==='ERROR';
@@ -201,6 +223,10 @@ async function api(path,body){
     return true;
   }catch(e){showAlert(e.message,false);return false;}
 }
+function toggleOta(){
+  const enabled=$('btn-ota').textContent.indexOf('Disable')===0;
+  return api('/ota/arduino',{enabled:!enabled});
+}
 function gatherParams(){
   const sc=$('scenario').value;
   const defs=scenarios[sc];
@@ -222,6 +248,7 @@ $('btn-pause').addEventListener('click',()=>api('/pause'));
 $('btn-resume').addEventListener('click',()=>api('/resume'));
 $('btn-stop').addEventListener('click',()=>api('/stop'));
 $('btn-reset').addEventListener('click',()=>api('/reset'));
+$('btn-ota').addEventListener('click',toggleOta);
 renderParams();
 fetchStatus();
 pollTimer=setInterval(fetchStatus,1000);
@@ -255,6 +282,11 @@ static void build_status_json(JsonDocument& doc) {
     doc["uptime_sec"] = millis() / 1000;
     doc["ip"] = wifi_manager_ip();
     doc["version"] = FIRMWARE_VERSION_STRING;
+    doc["ota_enabled"] = ota_manager_is_enabled();
+    doc["ota_state"] = ota_manager_get_state();
+    doc["ota_message"] = ota_manager_get_message();
+    doc["ota_hostname"] = ota_manager_get_hostname();
+    doc["ota_port"] = ota_manager_get_port();
 }
 
 static bool validate_params(SenderScenario sc, const ScenarioParams& p, String& out_error) {
@@ -405,6 +437,37 @@ static void handle_start() {
     s_server.send(200, "application/json", resp_str);
 }
 
+static void handle_ota_toggle() {
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, s_server.arg("plain"));
+    if (err) {
+        s_server.send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+        return;
+    }
+
+    const bool enabled = doc["enabled"] | false;
+    if (enabled) {
+        if (!ota_manager_enable()) {
+            String resp = String("{\"error\":\"") + ota_manager_get_message() + "\"}";
+            s_server.send(400, "application/json", resp);
+            return;
+        }
+    } else {
+        ota_manager_disable("Arduino OTA dimatikan dari web.");
+    }
+
+    JsonDocument resp;
+    resp["ok"] = true;
+    resp["enabled"] = ota_manager_is_enabled();
+    resp["state"] = ota_manager_get_state();
+    resp["message"] = ota_manager_get_message();
+    resp["hostname"] = ota_manager_get_hostname();
+    resp["port"] = ota_manager_get_port();
+    String resp_str;
+    serializeJson(resp, resp_str);
+    s_server.send(200, "application/json", resp_str);
+}
+
 void web_ui_init() {
     s_server.on("/", HTTP_GET, []() {
         Serial.printf("[WEB] GET / from %s\n", s_server.client().remoteIP().toString().c_str());
@@ -439,6 +502,7 @@ void web_ui_init() {
     });
 
     s_server.on("/api/start", HTTP_POST, handle_start);
+    s_server.on("/api/ota/arduino", HTTP_POST, handle_ota_toggle);
 
     s_server.on("/api/pause", HTTP_POST, []() {
         if (stats_get_state() != SS_RUNNING) {

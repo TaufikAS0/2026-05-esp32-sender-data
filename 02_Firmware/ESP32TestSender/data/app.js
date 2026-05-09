@@ -71,6 +71,12 @@ function updateStats(d){
   $('ls-remaining').textContent=(rem===0xFFFFFFFF?'∞':fmtTime(rem||0));
   $('ls-gaps').textContent=d.injected_gaps_count||0;
   $('ls-heap').textContent=(d.free_heap||0).toLocaleString();
+  const otaEnabled=!!d.ota_enabled;
+  const otaState=(d.ota_state||'off').toUpperCase();
+  $('ota-state').textContent=otaState;
+  $('ota-msg').textContent=d.ota_message||'Arduino OTA nonaktif secara default.';
+  $('btn-ota').textContent=otaEnabled?'Disable Arduino OTA':'Enable Arduino OTA';
+  $('btn-ota').disabled=d.ota_state==='uploading'||d.ota_state==='restarting';
 
   const running=st==='RUNNING';
   const paused=st==='PAUSED';
@@ -107,6 +113,11 @@ async function api(path,body){
   }catch(e){showAlert(e.message,false);return false;}
 }
 
+function toggleOta(){
+  const enabled=$('btn-ota').textContent.indexOf('Disable')===0;
+  return api('/ota/arduino',{enabled:!enabled});
+}
+
 function gatherParams(){
   const sc=$('scenario').value;
   const defs=scenarios[sc];
@@ -129,6 +140,7 @@ $('btn-pause').addEventListener('click',()=>api('/pause'));
 $('btn-resume').addEventListener('click',()=>api('/resume'));
 $('btn-stop').addEventListener('click',()=>api('/stop'));
 $('btn-reset').addEventListener('click',()=>api('/reset'));
+$('btn-ota').addEventListener('click',toggleOta);
 
 renderParams();
 fetchStatus();

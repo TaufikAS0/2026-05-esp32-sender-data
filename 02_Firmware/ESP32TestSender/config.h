@@ -34,6 +34,10 @@
 #define OLED_RESET_PIN          (-1)
 #define OLED_REFRESH_MS         500UL
 
+// === Arduino OTA (optional, off by default) ===
+#define OTA_PORT                3232
+#define OTA_HOSTNAME            MDNS_HOSTNAME
+
 // === Web ===
 #define WS_UPDATE_INTERVAL_MS   1000    // push stats ke browser tiap 1 detik
 

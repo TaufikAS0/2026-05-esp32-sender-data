@@ -8,6 +8,7 @@
 #include "web_ui.h"
 #include "status_led.h"
 #include "oled_status.h"
+#include "ota_manager.h"
 #include "firmware_version.h"
 #include "wifi_manager.h"
 
@@ -40,6 +41,7 @@ void setup() {
     // Init modules
     sender_task_init();
     wifi_manager_init();
+    ota_manager_init();
     web_ui_init();
 
     stats_set_state(SS_IDLE);
@@ -50,6 +52,7 @@ void setup() {
 
 void loop() {
     wifi_manager_update();
+    ota_manager_handle();
     web_ui_update();
     status_led_update();
     oled_status_update();
